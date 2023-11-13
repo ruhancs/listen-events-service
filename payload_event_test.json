@@ -1,0 +1,8 @@
+{
+    "type": "create-order",
+    "service": "payment-service",
+    "day": 12,
+    "month": 6,
+    "year": 12,
+    "status": "created"
+}

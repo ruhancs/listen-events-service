@@ -1,0 +1,9 @@
+{
+    "message":"payment-refused",
+    "service":"payment-service",
+    "day":8,
+    "month":5,
+    "Year":2022,
+    "status_code":409,
+    "user_info":"so:linux"
+}
