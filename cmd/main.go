@@ -11,6 +11,7 @@ import (
 	"github.com/ruhancs/listen-events/internal/application/dto"
 	"github.com/ruhancs/listen-events/internal/application/factory"
 	elastic "github.com/ruhancs/listen-events/internal/infra/database/elasticksearch"
+	"github.com/ruhancs/listen-events/internal/infra/web"
 	rabbitmq "github.com/ruhancs/listen-events/pkg/queue"
 )
 
@@ -21,7 +22,8 @@ func main() {
 	}
 	elkClient := elastic.ConnectWithElasticSearch(context.Background())
 
-	registerEventUseCase := factory.RegisterEventUseCaseFactory(elkClient)
+	//registerEventUseCase := factory.RegisterEventUseCaseFactory(elkClient)
+	bulkRegisterEventUseCase := factory.BulkRegisterEventUseCaseFactory(elkClient)
 	registerLogErrorUseCase := factory.RegisterLogErrorUseCaseFactory(elkClient)
 	
 	ch,err := rabbitmq.OpenChannel()
@@ -37,15 +39,41 @@ func main() {
 	go rabbitmq.Consumer(ch,msgsOutLogError,"log_errors")
 	
 	go func ()  {
+		var eventsToRegister []dto.RegisterEventInputDto
 		for msg := range msgsOutEvent {
-			fmt.Println("event received")
-			var inputRegisterEvent dto.RegisterEventInputDto
-			err := json.Unmarshal(msg.Body,&inputRegisterEvent)
+				var inputRegisterEvent dto.RegisterEventInputDto
+				err := json.Unmarshal(msg.Body,&inputRegisterEvent)
+				if err != nil {
+					//criar dead letter queue
+					log.Panic(err)
+				}
+				//msg.Ack(false)
+				eventsToRegister = append(eventsToRegister, inputRegisterEvent)
+				fmt.Println(len(eventsToRegister))
+				if len(eventsToRegister) == 3 {
+					fmt.Println("Proccess All Events")
+					outputMsg,err := bulkRegisterEventUseCase.Execute(context.Background(),eventsToRegister)
+					if err != nil {
+						//criar dead letter queue
+						log.Panic(err)
+					}
+					log.Println(outputMsg)
+					eventsToRegister = []dto.RegisterEventInputDto{}
+				}
+				//apagar msg da fila
+				msg.Ack(false)
+			}
+		}()
+	
+	go func ()  {
+		for msg := range msgsOutLogError {
+			var inputRegisterLogError dto.RegisterLogErrortInputDto
+			err := json.Unmarshal(msg.Body,&inputRegisterLogError)
 			if err != nil {
 				//criar dead letter queue
 				log.Panic(err)
 			}
-			outputMsg,err := registerEventUseCase.Execute(context.Background(),inputRegisterEvent)
+			outputMsg,err := registerLogErrorUseCase.Execute(context.Background(),inputRegisterLogError)
 			if err != nil {
 				//criar dead letter queue
 				log.Panic(err)
@@ -54,22 +82,11 @@ func main() {
 			//apagar msg da fila
 			msg.Ack(false)
 		}
-		}()
-		
-	for msg := range msgsOutLogError {
-		var inputRegisterLogError dto.RegisterLogErrortInputDto
-		err := json.Unmarshal(msg.Body,&inputRegisterLogError)
-		if err != nil {
-			//criar dead letter queue
-			log.Panic(err)
-		}
-		outputMsg,err := registerLogErrorUseCase.Execute(context.Background(),inputRegisterLogError)
-		if err != nil {
-			//criar dead letter queue
-			log.Panic(err)
-		}
-		log.Println(outputMsg)
-		//apagar msg da fila
-		msg.Ack(false)
-	}
+	}()
+	
+	searchEventUseCase := factory.SearchEventUseCaseFactory(elkClient)
+	searchLogErrorUseCase := factory.SearchLogErrorUseCaseFactory(elkClient)
+	app := web.NewApplication(searchEventUseCase,searchLogErrorUseCase)
+
+	app.Server()
 }

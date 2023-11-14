@@ -88,19 +88,14 @@ func (repo *EventRepository) GetByID(ctx context.Context,id string) (dto.GetEven
 
 func (repo *EventRepository) SearchByTypeServiceDateAndStatus(ctx context.Context,input dto.SearchWithTypeServiceDateStatusInputDto) (dto.SearchWithTypeServiceDateStatusOutputDto, error) {
 	var searchBuffer bytes.Buffer
+	var match = []map[string]any{
+		map[string]any{"match":map[string]any{"service":input.Service}},
+		map[string]any{"match":map[string]any{"type":input.Type}},
+	}
 	search := map[string]interface{}{
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
-				"must": map[string]interface{}{
-					"match": map[string]any{
-						"service.en": input.Service,
-						"type.en": input.Type,
-						"status.en": input.Status,
-						"day.en": input.Day,
-						"month.en": input.Month,
-						"year.en": input.Year,
-					},
-				},
+				"must": match,
 			},
 		},
 	}

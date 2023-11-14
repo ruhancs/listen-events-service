@@ -12,6 +12,12 @@ func RegisterEventUseCaseFactory(elkClient *elasticsearch.Client) *usecase.Regis
 	return usecase
 }
 
+func BulkRegisterEventUseCaseFactory(elkClient *elasticsearch.Client) *usecase.BulkRegisterEventsUseCase {
+	eventRepository := repository.NewEventRepository(elkClient)
+	usecase := usecase.NewBulkRegisterEventsUseCase(eventRepository)
+	return usecase
+}
+
 func GetEventByIDUseCaseFactory(elkClient *elasticsearch.Client) *usecase.GetEventByIDUseCase {
 	eventRepository := repository.NewEventRepository(elkClient)
 	usecase := usecase.NewGetEventByIDUseCase(eventRepository)
