@@ -1,6 +1,20 @@
 version: '3.0'
 
 services:
+  goapp:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - ELK_URL=http://elasticsearch:9200
+    networks:
+    - eventsservice
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.14.0
@@ -10,7 +24,7 @@ services:
     - ES_JAVA_OPTS=-Xms1g -Xmx1g
     - discovery.type=single-node
     - node.name=lonely-gopher
-    - cluster.name=es4gophers
+    - cluster.name=eventsservice
     ulimits:
       memlock:
         hard: -1
@@ -18,7 +32,7 @@ services:
     ports:
     - 9200:9200
     networks:
-    - es4gophers
+    - eventsservice
     healthcheck:
       interval: 10s
       retries: 20
@@ -36,7 +50,7 @@ services:
     ports:
     - 5601:5601
     networks:
-    - es4gophers
+    - eventsservice
     healthcheck:
       interval: 10s
       retries: 20
@@ -54,7 +68,9 @@ services:
       - RABBITMQ_DEFAULT_USER=guest
       - RABBITMQ_DEFAULT_PASS=guest
       - RABBITMQ_DEFAULT_VHOST=/
+    networks:
+    - eventsservice
 
 networks:
-  es4gophers:
+  eventsservice:
     driver: bridge

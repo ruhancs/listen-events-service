@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/joho/godotenv"
+	//"github.com/joho/godotenv"
 	"github.com/rabbitmq/amqp091-go"
 	"github.com/ruhancs/listen-events/internal/application/dto"
 	"github.com/ruhancs/listen-events/internal/application/factory"
@@ -16,10 +16,10 @@ import (
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		panic(err)
-	}
+	//err := godotenv.Load()
+	//if err != nil {
+	//	panic(err)
+	//}
 	elkClient := elastic.ConnectWithElasticSearch(context.Background())
 
 	//registerEventUseCase := factory.RegisterEventUseCaseFactory(elkClient)
@@ -45,17 +45,16 @@ func main() {
 				err := json.Unmarshal(msg.Body,&inputRegisterEvent)
 				if err != nil {
 					//criar dead letter queue
-					log.Panic(err)
+					defer restart()
 				}
 				//msg.Ack(false)
 				eventsToRegister = append(eventsToRegister, inputRegisterEvent)
-				fmt.Println(len(eventsToRegister))
 				if len(eventsToRegister) == 3 {
 					fmt.Println("Proccess All Events")
 					outputMsg,err := bulkRegisterEventUseCase.Execute(context.Background(),eventsToRegister)
 					if err != nil {
 						//criar dead letter queue
-						log.Panic(err)
+						defer restart()
 					}
 					log.Println(outputMsg)
 					eventsToRegister = []dto.RegisterEventInputDto{}
@@ -71,12 +70,12 @@ func main() {
 			err := json.Unmarshal(msg.Body,&inputRegisterLogError)
 			if err != nil {
 				//criar dead letter queue
-				log.Panic(err)
+				defer restart()
 			}
 			outputMsg,err := registerLogErrorUseCase.Execute(context.Background(),inputRegisterLogError)
 			if err != nil {
 				//criar dead letter queue
-				log.Panic(err)
+				defer restart()
 			}
 			log.Println(outputMsg)
 			//apagar msg da fila
@@ -89,4 +88,10 @@ func main() {
 	app := web.NewApplication(searchEventUseCase,searchLogErrorUseCase)
 
 	app.Server()
+}
+
+func restart() {
+	if r := recover(); r != nil {
+		log.Println("Recovered application of the err: ",r)
+	}
 }
